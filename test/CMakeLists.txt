@@ -8,6 +8,7 @@ file(DOWNLOAD
 # The main test driver.
 add_executable(testmain
         test.cpp
+        basic.cpp
         )
 target_include_directories(testmain
         PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
