@@ -157,10 +157,11 @@ public:
     using Ext_container = E;
 
     /** Initializes to an all-false bit set of a given size.
+     *
+     * @param size The number of bits that need to be held.
      */
 
     Fbitset(Size size)
-        : size_(size)
     {
         if (size <= MAX_BITS) {
             for (Size i = 0; i < N; ++i) {
@@ -184,10 +185,14 @@ public:
     // General operations.
     //
 
-    /** Gets the size of the bit set.
+    /** Gets the maximum number of bits that can be hold.
+     *
+     * Note that this size is not necessarily the size of bits given to the
+     * constructor, but rather the number of bits that *can be* hold by the bit
+     * set.
      */
 
-    Size size() const { return size_; }
+    Size size() const noexcept { return get_n_limbs() * LIMB_BITS; }
 
     /** Makes equality comparison.
      */
@@ -365,13 +370,13 @@ private:
 
     const Limb& get_limb(Size idx) const
     {
-        assert(idx < size_);
+        assert(idx < size());
         return get_limb_lidx(get_lidx(idx));
     }
 
     Limb& get_limb(Size idx)
     {
-        assert(idx < size_);
+        assert(idx < size());
         return get_limb_lidx(get_lidx(idx));
     }
 
@@ -458,11 +463,6 @@ private:
     //
     // Internal data fields.
     //
-
-    /** The number of bits.
-     */
-
-    Size size_;
 
     /** The actual limbs stored in-place.
      */

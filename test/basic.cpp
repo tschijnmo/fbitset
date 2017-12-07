@@ -43,7 +43,7 @@ TEST_CASE("Fbitset has basic behaviour")
     SECTION("are initialized to all false by default")
     {
         run_on_all([&](const auto& i) {
-            CHECK(i.size() == N_BITS);
+            CHECK(i.size() >= N_BITS);
             for (Size j = 0; j < N_BITS; ++j) {
                 CHECK_FALSE(i[j]);
             }
