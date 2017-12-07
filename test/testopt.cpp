@@ -17,9 +17,9 @@ using namespace fbitset;
 
 using One64_no_ext = Fbitset<1, uint64_t, No_ext>;
 
-using Two32_no_ext = Fbitset<2, uint32_t, No_ext>;
+using Two64_no_ext = Fbitset<2, uint64_t, No_ext>;
 
-using Two32_ext = Fbitset<2, uint32_t, std::vector<uint32_t>>;
+using One64_ext = Fbitset<1, uint64_t, std::vector<uint64_t>>;
 
 //
 // Simple union of two bitsets.
@@ -41,9 +41,14 @@ One64_no_ext union_one64_no_ext(One64_no_ext& o1, One64_no_ext& o2)
 
 uint64_t union_one64_ref(uint64_t& o1, uint64_t& o2) { return o1 | o2; }
 
-Two32_no_ext union_two32_no_ext(Two32_no_ext& o1, Two32_no_ext& o2)
+// A pair of two 64-bit integers, primarily the loop needs to be unrolled.
+
+Two64_no_ext union_two64_no_ext(Two64_no_ext& o1, Two64_no_ext& o2)
 {
     return o1 | o2;
 }
 
-Two32_ext union_two32_ext(Two32_ext& o1, Two32_ext& o2) { return o1 | o2; }
+// External enabled.  The overhead should be curbed low relative to plain union
+// of two 64-bit integers.
+
+One64_ext union_one64_ext(One64_ext& o1, One64_ext& o2) { return o1 | o2; }
