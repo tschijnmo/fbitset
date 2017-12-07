@@ -19,3 +19,6 @@ add_executable(testmain
 # Tests supposed to crash with assertion failure.
 add_executable(crash_no_ext crash_no_ext.cpp)
 
+# Tests added for the sake of peeking at the assembly output from the compiler.
+add_library(testopt testopt.cpp)
+
