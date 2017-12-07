@@ -57,7 +57,7 @@ namespace internal {
         /** Test if the container is holding any bits.
          */
 
-        explicit operator bool() const { return cont.size() > 0; }
+        explicit operator bool() const noexcept { return !cont.empty(); }
     };
 
     /** Holder for external container when it is disabled.
