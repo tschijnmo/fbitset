@@ -12,7 +12,7 @@ include_directories(testmain
 
 # The main test driver.
 add_executable(testmain
-        test.cpp
+        testmain.cpp
         basic.cpp
         )
 
