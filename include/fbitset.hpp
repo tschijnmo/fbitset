@@ -40,7 +40,7 @@ namespace internal {
         /** The container.
          */
 
-        T cont;
+        T limbs;
 
         static constexpr bool allow_ext = true;
 
@@ -50,14 +50,14 @@ namespace internal {
          */
 
         Ext()
-            : cont{}
+            : limbs{}
         {
         }
 
         /** Test if the container is holding any bits.
          */
 
-        explicit operator bool() const noexcept { return !cont.empty(); }
+        explicit operator bool() const noexcept { return !limbs.empty(); }
     };
 
     /** Holder for external container when it is disabled.
@@ -154,7 +154,7 @@ public:
     /** The external container type.
      */
 
-    using Ext_container = E;
+    using Ext_limbs = E;
 
     /** Initializes to an all-false bit set of a given size.
      *
@@ -170,7 +170,7 @@ public:
         } else {
             if constexpr (allow_ext) {
                 Size n_limbs = (size + LIMB_BITS - 1) / LIMB_BITS;
-                ext_.cont.assign(n_limbs, 0);
+                ext_.limbs.assign(n_limbs, 0);
             } else {
                 assert(0);
             }
@@ -205,7 +205,7 @@ public:
             return o1.limbs_ == o2.limbs_;
         } else {
             if (o1.ext_) {
-                return o1.ext_.cont == o2.ext_.cont;
+                return o1.ext_.limbs == o2.ext_.limbs;
             } else {
                 return o1.limbs_ == o2.limbs_;
             }
@@ -230,7 +230,7 @@ public:
             return hash(limbs_.cbegin(), N);
         } else {
             if (ext_) {
-                return hash(ext_.cont.cbegin(), ext_.cont.size());
+                return hash(ext_.limbs.cbegin(), ext_.limbs.size());
             } else {
                 return hash(limbs_.cbegin(), N);
             }
@@ -345,7 +345,7 @@ private:
             return N_LIMBS;
         } else {
             if (ext_) {
-                return ext_.cont.size();
+                return ext_.limbs.size();
             } else {
                 return N_LIMBS;
             }
@@ -396,7 +396,7 @@ private:
             }
         } else {
             if (ext_) {
-                return ext_.cont[lidx];
+                return ext_.limbs[lidx];
             } else {
                 return limbs_[lidx];
             }
@@ -464,10 +464,15 @@ private:
     // Internal data fields.
     //
 
+    /** The container for in-place limbs.
+     */
+
+    using Limbs = std::array<Limb, N>;
+
     /** The actual limbs stored in-place.
      */
 
-    std::array<Limb, N> limbs_;
+    Limbs limbs_;
 
     // The fall-back external container.
 
