@@ -11,6 +11,7 @@
 #include <cassert>
 #include <functional>
 #include <limits>
+#include <type_traits>
 #include <vector>
 
 namespace fbitset {
@@ -409,30 +410,71 @@ private:
             static_cast<const Fbitset*>(this)->get_limb_lidx(lidx));
     }
 
+    //
+    // Core visiting functions.
+    //
+    // These functions aims to abstract away from the actual data layout of the
+    // bit sets.  Usually a generic callable needs to be given, which can treat
+    // both `Limbs` arguments or `Ext_limbs` arguments.
+    //
+
+    /** Takes an unary action on the limbs.
+     */
+
+    template <typename B, typename U>
+    static decltype(auto) exec_limbs(B* o, U act)
+    {
+        static_assert(std::is_same_v<std::decay_t<B>, Fbitset>);
+
+        if constexpr (!allow_ext) {
+            return act(o->limbs_);
+        } else {
+            if (o->ext_) {
+                return act(o->ext_.limbs);
+            } else {
+                return act(o->limbs_);
+            }
+        }
+    }
+
+    /** Takes a binary operation on the limbs.
+     *
+     * The two bit sets need to be of the same type and have the same size.
+     */
+
+    template <typename B, typename C, typename U>
+    static decltype(auto) exec_limbs(B* o1, C* o2, U act)
+    {
+        static_assert(std::is_same_v<std::decay_t<B>, Fbitset>);
+        static_assert(std::is_same_v<std::decay_t<C>, Fbitset>);
+        assert(o1->size() == o2->size());
+
+        if constexpr (!allow_ext) {
+            return act(o1->limbs_, o2->limbs_);
+        } else {
+            if (o1->ext_) {
+                assert(o2->ext_);
+                return act(o1->ext_.limbs, o2->ext_.limbs);
+            } else {
+                assert(!o2->ext_);
+                return act(o1->limbs_, o2->limbs_);
+            }
+        }
+    }
+
     /** Apply the given callable to matching pairs of limbs.
      */
 
-    template <typename T> void zip_limbs(const Fbitset& other, T act)
+    template <typename T> void zip_limbs(const Fbitset& o, T act)
     {
-        if constexpr (!allow_ext) {
-            for (Size i = 0; i < N_LIMBS; ++i) {
-                act(limbs_[i], other.limbs_[i]);
-            }
-        } else {
-            if (ext_) {
-                auto i = ext_.cont.begin();
-                auto j = other.ext_.cont.cbegin();
-                while (i != ext_.cont.end()) {
-                    act(*i, *j);
-                    ++i;
-                    ++j;
+        exec_limbs(
+            this, &o, [&act, this](auto& self, const auto& other) -> void {
+                for (Size i = 0; i < get_n_limbs(); ++i) {
+                    act(self[i], other[i]);
                 }
-            } else {
-                for (Size i = 0; i < N_LIMBS; ++i) {
-                    act(limbs_[i], other.limbs_[i]);
-                }
-            }
-        }
+            });
+
+        return;
     }
 
     //
