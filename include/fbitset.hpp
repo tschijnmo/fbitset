@@ -200,17 +200,8 @@ public:
 
     friend bool operator==(const Fbitset& o1, const Fbitset& o2)
     {
-        assert(o1.size() == o2.size());
-
-        if constexpr (!allow_ext) {
-            return o1.limbs_ == o2.limbs_;
-        } else {
-            if (o1.ext_) {
-                return o1.ext_.limbs == o2.ext_.limbs;
-            } else {
-                return o1.limbs_ == o2.limbs_;
-            }
-        }
+        return exec_limbs(&o1, &o2,
+            [](const auto& i, const auto& j) -> bool { return i == j; });
     }
 
     friend bool operator!=(const Fbitset& o1, const Fbitset& o2)
@@ -227,15 +218,9 @@ public:
 
     size_t hash() const
     {
-        if constexpr (!allow_ext) {
-            return hash(limbs_.cbegin(), N);
-        } else {
-            if (ext_) {
-                return hash(ext_.limbs.cbegin(), ext_.limbs.size());
-            } else {
-                return hash(limbs_.cbegin(), N);
-            }
-        }
+        return exec_limbs(this, [this](const auto& limbs) -> size_t {
+            return hash(limbs.cbegin(), get_n_limbs());
+        });
     }
 
     /** Sets a given bit.
@@ -388,20 +373,8 @@ private:
     {
         assert(lidx < get_n_limbs());
 
-        if constexpr (!allow_ext) {
-            if constexpr (N_LIMBS == 1) {
-                assert(lidx == 0);
-                return limbs_[0];
-            } else {
-                return limbs_[lidx];
-            }
-        } else {
-            if (ext_) {
-                return ext_.limbs[lidx];
-            } else {
-                return limbs_[lidx];
-            }
-        }
+        return exec_limbs(this,
+            [lidx](auto& limbs) -> decltype(auto) { return limbs[lidx]; });
     }
 
     Limb& get_limb_lidx(Size lidx)
