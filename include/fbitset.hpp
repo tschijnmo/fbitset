@@ -317,7 +317,15 @@ private:
     /** Gets the limb index for a given bit index.
      */
 
-    static Size get_lidx(Size idx) { return idx / LIMB_BITS; }
+    static Size get_lidx(Size idx)
+    {
+        if constexpr (!allow_ext && N_LIMBS == 1) {
+            assert(idx < LIMB_BITS);
+            return 0;
+        } else {
+            return idx / LIMB_BITS;
+        }
+    }
 
     /** Get the number of limbs.
      *
