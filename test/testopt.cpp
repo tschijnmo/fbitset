@@ -65,3 +65,26 @@ size_t hash_one64_no_ext(One64_no_ext& inp)
     std::hash<One64_no_ext> hash{};
     return hash(inp);
 }
+
+//
+// Find last set
+//
+// Here we just attempt to make sure that the native machine instruction is
+// used.
+//
+
+Size fls_one64_no_ext(One64_no_ext& inp)
+{
+    return inp.find_last();
+}
+
+Size fls_two64_no_ext(Two64_no_ext& inp)
+{
+    return inp.find_last();
+}
+
+Size fls_one64_ext(One64_ext& inp)
+{
+    return inp.find_last();
+}
+
