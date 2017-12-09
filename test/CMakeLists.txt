@@ -5,15 +5,15 @@ file(DOWNLOAD
         "${CMAKE_CURRENT_BINARY_DIR}/catch.hpp"
         )
 
-include_directories(testmain
-        PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
-        PRIVATE "${PROJECT_SOURCE_DIR}/include"
-        )
 
 # The main test driver.
 add_executable(testmain
         testmain.cpp
         basic.cpp
+        )
+
+target_include_directories(testmain
+        PRIVATE ${CMAKE_CURRENT_BINARY_DIR}
         )
 
 # Tests supposed to crash with assertion failure.
