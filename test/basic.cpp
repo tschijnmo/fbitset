@@ -109,6 +109,24 @@ TEST_CASE("Fbitset has basic behaviour")
         });
     }
 
+    SECTION("given number of lower bits can be set to true")
+    {
+        run_on_all([](auto& inp) {
+            inp.set(63);
+            for (Size i = 0; i <= N_BITS; i += 16) {
+                inp.set_all(i);
+
+                for (Size j = 0; j < N_BITS; ++j) {
+                    if (j < i || j == 63) {
+                        CHECK(inp[j]);
+                    } else {
+                        CHECK_FALSE(inp[j]);
+                    }
+                }
+            }
+        });
+    }
+
     SECTION("bits can be flipped")
     {
         run_on_all([&](auto& inp) {
