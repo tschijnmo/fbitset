@@ -162,7 +162,7 @@ public:
      * @param size The number of bits that need to be held.
      */
 
-    Fbitset(Size size)
+    Fbitset(Size size, bool set_true = false)
     {
         if (size <= MAX_BITS) {
             for (Size i = 0; i < N; ++i) {
@@ -175,6 +175,10 @@ public:
             } else {
                 assert(0);
             }
+        }
+
+        if (set_true) {
+            set_all(size);
         }
     }
 
