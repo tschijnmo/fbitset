@@ -232,6 +232,29 @@ public:
         return;
     }
 
+    /** Sets all given number of lower bits.
+     *
+     * The lower `num` bits will be all toppled to true.
+     */
+
+    void set_all(Size num)
+    {
+        assert(num <= size());
+
+        exec_limbs(this, [num](auto& limbs) {
+            Size idx = 0;
+            auto remain = num;
+            while (remain >= LIMB_BITS) {
+                limbs[idx] = std::numeric_limits<Limb>::max();
+                ++idx;
+                remain -= LIMB_BITS;
+            }
+            if (remain > 0) {
+                limbs[idx] |= (static_cast<Limb>(1) << remain) - 1;
+            }
+        });
+    }
+
     /** Test a given bit.
      *
      * Note that different from STL bitset, here the result is a pr-value of
