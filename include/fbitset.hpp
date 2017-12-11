@@ -132,6 +132,12 @@ namespace internal {
 template <Size N, typename L = unsigned long long, typename E = std::vector<L>>
 class Fbitset {
 public:
+    // Check the sensibility of the given types.
+
+    static_assert(std::numeric_limits<L>::is_integer
+            && !std::numeric_limits<L>::is_signed,
+        "Limb needs to be unsigned integral type");
+
     /** The number of limbs allowed inside.
      */
 
