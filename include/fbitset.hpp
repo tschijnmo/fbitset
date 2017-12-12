@@ -96,6 +96,16 @@ namespace internal {
         assert(x != 0);
         return std::numeric_limits<T>::digits - clz(x) - 1;
     }
+
+    /** Counts the number of set bits.
+     */
+
+    inline Size popcount(unsigned int x) { return __builtin_popcount(x); }
+    inline Size popcount(unsigned long x) { return __builtin_popcountl(x); }
+    inline Size popcount(unsigned long long x)
+    {
+        return __builtin_popcountll(x);
+    }
 }
 
 /** A set of bits.
@@ -338,6 +348,20 @@ public:
             }
         }
         return -1;
+    }
+
+    /** Counts the number of all set bits inside the set.
+     */
+
+    Size count() const noexcept
+    {
+        return exec_limbs(this, [this](const auto& limbs) -> Size {
+            Size res = 0;
+            for (Size i = 0; i < get_n_limbs(); ++i) {
+                res += internal::popcount(limbs[i]);
+            }
+            return res;
+        });
     }
 
 private:
