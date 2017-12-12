@@ -47,6 +47,7 @@ TEST_CASE("Fbitset has basic behaviour")
             for (Size j = 0; j < N_BITS; ++j) {
                 CHECK_FALSE(i[j]);
             }
+            CHECK(i.count() == 0);
         });
     }
 
@@ -66,6 +67,7 @@ TEST_CASE("Fbitset has basic behaviour")
                         CHECK_FALSE(curr[j]);
                     }
                 }
+                CHECK(curr.count() == n_set);
             }
         });
     }
@@ -224,6 +226,8 @@ TEST_CASE("Fbitset has basic behaviour")
         run_on_all([&](auto& i) {
             i.set(2);
             i.set(60);
+
+            CHECK(i.count() == 2);
 
             auto high = i.find_last();
             CHECK(high == 60);
