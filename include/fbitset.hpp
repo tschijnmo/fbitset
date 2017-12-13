@@ -275,6 +275,18 @@ public:
         });
     }
 
+    /** Clears all bits inside.
+     */
+
+    void clear() noexcept
+    {
+        exec_limbs(this, [this](auto& limbs) {
+            for (Size i = 0; i < get_n_limbs(); ++i) {
+                limbs[i] = 0;
+            }
+        });
+    }
+
     /** Test a given bit.
      *
      * Note that different from STL bitset, here the result is a pr-value of
