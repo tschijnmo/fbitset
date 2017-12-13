@@ -131,11 +131,11 @@ TEST_CASE("Fbitset has basic behaviour")
         });
     }
 
-    SECTION("given number of lower bits can be set to true")
+    SECTION("given number of lower bits can be set to true and cleared")
     {
         run_on_all([](auto& inp) {
-            inp.set(63);
             for (Size i = 0; i <= N_BITS; i += 16) {
+                inp.set(63);
                 inp.set_all(i);
 
                 for (Size j = 0; j < N_BITS; ++j) {
@@ -144,6 +144,11 @@ TEST_CASE("Fbitset has basic behaviour")
                     } else {
                         CHECK_FALSE(inp[j]);
                     }
+                }
+
+                inp.clear();
+                for (Size j = 0; j < N_BITS; ++j) {
+                    CHECK_FALSE(inp[j]);
                 }
             }
         });
