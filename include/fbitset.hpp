@@ -465,7 +465,10 @@ private:
     //
     // These functions aims to abstract away from the actual data layout of the
     // bit sets.  Usually a generic callable needs to be given, which can treat
-    // both `Limbs` arguments or `Ext_limbs` arguments.
+    // both `Limbs` arguments or `Ext_limbs` arguments.  For looping over
+    // limbs, normally we loop an index from zero up to `get_n_limbs()`.  It
+    // has been shown that both g++ and clang++ optimize this loop better than
+    // the begin/end iterator pair paradigm.
     //
 
     /** Takes an unary action on the limbs.
