@@ -207,7 +207,7 @@ TEST_CASE("Fbitset has basic behaviour")
         });
     }
 
-    SECTION("has correct union and intersection operation")
+    SECTION("has correct arithmetic operations")
     {
         run_on_all([&](auto i) {
             using Bitset = decltype(i);
@@ -243,6 +243,16 @@ TEST_CASE("Fbitset has basic behaviour")
                     CHECK_FALSE(inters_bits[i]);
                 }
             }
+
+            auto disj_bits = bits1 ^ bits2;
+            for (Size i = 0; i < N_BITS; ++i) {
+                if ((i % S1 == 0) != (i % S2 == 0)) {
+                    CHECK(disj_bits[i]);
+                } else {
+                    CHECK_FALSE(disj_bits[i]);
+                }
+            }
+
         });
     }
 
