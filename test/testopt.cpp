@@ -73,34 +73,21 @@ size_t hash_one64_no_ext(One64_no_ext& inp)
 // used.
 //
 
-Size fls_one64_no_ext(One64_no_ext& inp)
-{
-    return inp.find_last();
-}
+Size fls_one64_no_ext(One64_no_ext& inp) { return inp.find_last(); }
 
-Size fls_two64_no_ext(Two64_no_ext& inp)
-{
-    return inp.find_last();
-}
+Size fls_two64_no_ext(Two64_no_ext& inp) { return inp.find_last(); }
 
-Size fls_one64_ext(One64_ext& inp)
-{
-    return inp.find_last();
-}
+Size fls_one64_ext(One64_ext& inp) { return inp.find_last(); }
 
 //
 // Population count
 //
 
-Size count_one64_no_ext(One64_no_ext& inp)
-{
-    return inp.count();
-}
+Size count_one64_no_ext(One64_no_ext& inp) { return inp.count(); }
 
-Size count_two64_no_ext(Two64_no_ext& inp)
-{
-    return inp.count();
-}
+Size count_two64_no_ext(Two64_no_ext& inp) { return inp.count(); }
+
+Size count_one64_ext(One64_ext& inp) { return inp.count(); }
 
 Size count_one64_ext(One64_ext& inp)
 {
