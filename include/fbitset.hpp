@@ -214,14 +214,14 @@ public:
 
         Size operator*() const noexcept { return curr_; }
 
-        const_iterator& operator++()
+        const_iterator& operator++() noexcept
         {
             get_next();
             return *this;
         }
 
     private:
-        void get_next()
+        void get_next() noexcept
         {
             curr_ = exec_limbs(&fbitset_, [this](auto& limbs) -> Size {
                 while (*this && limbs[curr_limb_] == 0) {
@@ -332,13 +332,13 @@ public:
     /** Makes equality comparison.
      */
 
-    friend bool operator==(const Fbitset& o1, const Fbitset& o2)
+    friend bool operator==(const Fbitset& o1, const Fbitset& o2) noexcept
     {
         return exec_limbs(&o1, &o2,
             [](const auto& i, const auto& j) -> bool { return i == j; });
     }
 
-    friend bool operator!=(const Fbitset& o1, const Fbitset& o2)
+    friend bool operator!=(const Fbitset& o1, const Fbitset& o2) noexcept
     {
         return !(o1 == o2);
     }
@@ -350,7 +350,7 @@ public:
      * this hash function.
      */
 
-    size_t hash() const
+    size_t hash() const noexcept
     {
         return exec_limbs(this, [this](const auto& limbs) -> size_t {
             return hash(limbs.cbegin(), get_n_limbs());
@@ -360,7 +360,7 @@ public:
     /** Sets a given bit.
      */
 
-    void set(Size idx)
+    void set(Size idx) noexcept
     {
         get_limb(idx) |= get_mask(idx);
         return;
@@ -371,7 +371,7 @@ public:
      * The lower `num` bits will be all toppled to true.
      */
 
-    void set_all(Size num)
+    void set_all(Size num) noexcept
     {
         assert(num <= size());
 
@@ -407,7 +407,7 @@ public:
      * boolean type, rather than a proxy for the actual bit.
      */
 
-    bool operator[](Size idx) const
+    bool operator[](Size idx) const noexcept
     {
         return (get_limb(idx) & get_mask(idx)) != 0;
     }
@@ -415,7 +415,7 @@ public:
     /** Flips a given bit.
      */
 
-    void flip(Size idx)
+    void flip(Size idx) noexcept
     {
         get_limb(idx) ^= get_mask(idx);
         return;
@@ -428,7 +428,7 @@ public:
     /** Computes the bitwise or (union).
      */
 
-    Fbitset& operator|=(const Fbitset& other)
+    Fbitset& operator|=(const Fbitset& other) noexcept
     {
         zip_limbs(other, [](Limb& i, Limb j) { i |= j; });
         return *this;
@@ -444,7 +444,7 @@ public:
     /** Computes the bitwise and (intersection).
      */
 
-    Fbitset& operator&=(const Fbitset& other)
+    Fbitset& operator&=(const Fbitset& other) noexcept
     {
         zip_limbs(other, [](Limb& i, Limb j) { i &= j; });
         return *this;
@@ -460,7 +460,7 @@ public:
     /** Computes the bitwise xor (disjunctive union).
      */
 
-    Fbitset& operator^=(const Fbitset& other)
+    Fbitset& operator^=(const Fbitset& other) noexcept
     {
         zip_limbs(other, [](Limb& i, Limb j) { i ^= j; });
         return *this;
@@ -480,7 +480,7 @@ public:
     /** Finds the index of the last (highest) set bit.
      */
 
-    Size find_last() const
+    Size find_last() const noexcept
     {
         for (Size i = get_n_limbs(); i != 0; --i) {
             const auto& limb = get_limb_lidx(i - 1);
@@ -529,7 +529,7 @@ private:
     /** Gets the limb index for a given bit index.
      */
 
-    static Size get_lidx(Size idx)
+    static Size get_lidx(Size idx) noexcept
     {
         if constexpr (!allow_ext && N_LIMBS == 1) {
             assert(idx < LIMB_BITS);
@@ -545,7 +545,7 @@ private:
      * the limbs hold by the object.
      */
 
-    Size get_n_limbs() const
+    Size get_n_limbs() const noexcept
     {
         if constexpr (!allow_ext) {
             return N_LIMBS;
@@ -561,7 +561,7 @@ private:
     /** Gets the limb mask for a given bit index.
      */
 
-    static Limb get_mask(Size idx)
+    static Limb get_mask(Size idx) noexcept
     {
         Limb res = 1;
         res <<= idx % LIMB_BITS;
@@ -574,13 +574,13 @@ private:
      * underlying integral type as possible.
      */
 
-    const Limb& get_limb(Size idx) const
+    const Limb& get_limb(Size idx) const noexcept
     {
         assert(idx < size());
         return get_limb_lidx(get_lidx(idx));
     }
 
-    Limb& get_limb(Size idx)
+    Limb& get_limb(Size idx) noexcept
     {
         assert(idx < size());
         return get_limb_lidx(get_lidx(idx));
@@ -589,7 +589,7 @@ private:
     /** Gets the limb at a particular limb index.
      */
 
-    const Limb& get_limb_lidx(Size lidx) const
+    const Limb& get_limb_lidx(Size lidx) const noexcept
     {
         assert(lidx < get_n_limbs());
 
@@ -597,7 +597,7 @@ private:
             [lidx](auto& limbs) -> decltype(auto) { return limbs[lidx]; });
     }
 
-    Limb& get_limb_lidx(Size lidx)
+    Limb& get_limb_lidx(Size lidx) noexcept
     {
         return const_cast<Limb&>(
             static_cast<const Fbitset*>(this)->get_limb_lidx(lidx));
