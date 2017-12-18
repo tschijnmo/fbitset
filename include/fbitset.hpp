@@ -182,6 +182,85 @@ public:
 
     using Ext_limbs = E;
 
+    /** Iterators for iterator over the indices of the set bits.
+     *
+     * Note that this iterator class does not satisfy the C++ iterator concept.
+     * Rather than having a sentinel value to compare for testing the end, here
+     * we can explicitly evaluate the truth value of the iterator to see if it
+     * still has a values.
+     */
+
+    class const_iterator {
+    public:
+        /** Constructs the iterator for a bit set.
+         *
+         * This constructor constructs the iterator pointing to the first set
+         * bit in the given bit set.  Normally the `begin` method can be used
+         * instead.
+         */
+
+        const_iterator(const Fbitset& fbitset)
+            : fbitset_{ fbitset }
+            , curr_limb_{ 0 }
+        {
+            get_next();
+        }
+
+        explicit operator bool() const noexcept
+        {
+            return curr_limb_ < fbitset_.get_n_limbs();
+        }
+
+        Size operator*() const noexcept { return curr_; }
+
+        const_iterator& operator++()
+        {
+            get_next();
+            return *this;
+        }
+
+    private:
+        void get_next()
+        {
+            curr_ = exec_limbs(&fbitset_, [this](auto& limbs) -> Size {
+                while (*this && limbs[curr_limb_] == 0) {
+                    ++curr_limb_;
+                }
+
+                if (*this) {
+                    auto& limb = limbs[curr_limb_];
+                    assert(limb != 0);
+                    Size curr_idx = internal::ctz(limb);
+
+                    Limb mask = Limb(1) << curr_idx;
+                    assert((limb & mask) != 0);
+                    limb ^= mask;
+
+                    return curr_idx + curr_limb_ * LIMB_BITS;
+                } else {
+                    return -1;
+                }
+            });
+        }
+
+        /** A copy of the original bit set.
+         *
+         * The set bits in this copy are going to be gradually toppled.
+         */
+
+        Fbitset fbitset_;
+
+        /** The current bit index.
+         */
+
+        Size curr_;
+
+        /** The current limb index.
+         */
+
+        Size curr_limb_;
+    };
+
     /** Initializes to an all-false bit set of a given size.
      *
      * @param size The number of bits that need to be held.
