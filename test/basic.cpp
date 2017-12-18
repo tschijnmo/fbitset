@@ -246,4 +246,27 @@ TEST_CASE("Fbitset has basic behaviour")
             CHECK(fin == -1);
         });
     }
+
+    SECTION("can be iterated over correctly")
+    {
+        run_on_all([&](auto& inp) {
+            std::vector<Size> set_idxes = { 2, 60 };
+
+            for (auto i : set_idxes) {
+                inp.set(i);
+            }
+
+            CHECK(inp.count() == set_idxes.size());
+
+            std::vector<Size> res{};
+            for (auto i = inp.begin(); i; ++i) {
+                res.push_back(*i);
+            }
+
+            CHECK(res == set_idxes);
+
+            // The original bits should not be touched.
+            CHECK(inp.count() == set_idxes.size());
+        });
+    }
 }
