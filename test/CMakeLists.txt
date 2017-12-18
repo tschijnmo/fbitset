@@ -22,3 +22,14 @@ add_executable(crash_no_ext crash_no_ext.cpp)
 # Tests added for the sake of peeking at the assembly output from the compiler.
 add_library(testopt testopt.cpp)
 
+
+# The benchmark for looping over indices.
+add_library(testloop testloop.cpp)
+target_include_directories(testloop
+        PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
+        )
+add_executable(testloopbits testloopbits.cpp)
+target_link_libraries(testloopbits testloop)
+add_executable(testloopvector testloopvector.cpp)
+target_link_libraries(testloopvector testloop)
+
