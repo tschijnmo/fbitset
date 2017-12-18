@@ -72,6 +72,26 @@ TEST_CASE("Fbitset has basic behaviour")
         });
     }
 
+    SECTION("can be initialized from indices of set bits")
+    {
+        run_on_all([&](auto base) {
+            using Bitset = decltype(base);
+            std::vector<Size> idxes = { 1, 63 };
+            Bitset b0(N_BITS, idxes.cbegin(), idxes.cend());
+            Bitset b1(N_BITS, { 1, 63 });
+
+            for (Size i = 0; i < N_BITS; ++i) {
+                if (i == 1 || i == 63) {
+                    CHECK(b0[i]);
+                    CHECK(b1[i]);
+                } else {
+                    CHECK_FALSE(b0[i]);
+                    CHECK_FALSE(b1[i]);
+                }
+            }
+        });
+    }
+
     SECTION("have correct copy/move constructor/assignment")
     {
         constexpr Size STRIDE = 5;
