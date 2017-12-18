@@ -89,8 +89,19 @@ Size count_two64_no_ext(Two64_no_ext& inp) { return inp.count(); }
 
 Size count_one64_ext(One64_ext& inp) { return inp.count(); }
 
-Size count_one64_ext(One64_ext& inp)
-{
-    return inp.count();
-}
+//
+// Optimization for looping the set indices over.
+//
+// To avoid the optimizer from removing all the computing while keeping the
+// resulted assembly clean, here a meaningless computation is performed where
+// all the set indices are summed.
+//
 
+Size loop_one64_no_ext(One64_no_ext& inp)
+{
+    Size sum = 0;
+    for (auto i = inp.begin(); i; ++i) {
+        sum += *i;
+    }
+    return sum;
+}
