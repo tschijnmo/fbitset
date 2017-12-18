@@ -10,6 +10,7 @@
 #include <array>
 #include <cassert>
 #include <functional>
+#include <initializer_list>
 #include <limits>
 #include <type_traits>
 #include <vector>
@@ -284,6 +285,31 @@ public:
         if (set_true) {
             set_all(size);
         }
+    }
+
+    /** Constructs the bit set with the bits at the given indices set.
+     *
+     * The indices should be given as a pair of iterators giving the indices.
+     */
+
+    template <typename It>
+    Fbitset(Size size, It first_idx, It last_idx)
+        : Fbitset(size, false)
+    {
+        for (; first_idx != last_idx; ++first_idx) {
+            set(*first_idx);
+        }
+    }
+
+    /** Constructs a bit set with the set-bit indices given in a list.
+     *
+     * This constructor can be useful for creating bit sets as a simple
+     * literal.
+     */
+
+    Fbitset(Size size, std::initializer_list<Size> idxes)
+        : Fbitset(size, idxes.begin(), idxes.end())
+    {
     }
 
     // All Special functions are from the default implementation.
