@@ -457,6 +457,22 @@ public:
         return res;
     }
 
+    /** Computes the bitwise xor (disjunctive union).
+     */
+
+    Fbitset& operator^=(const Fbitset& other)
+    {
+        zip_limbs(other, [](Limb& i, Limb j) { i ^= j; });
+        return *this;
+    }
+
+    Fbitset operator^(const Fbitset& other) const
+    {
+        Fbitset res(*this);
+        res ^= other;
+        return res;
+    }
+
     //
     // Misc bit operations.
     //
