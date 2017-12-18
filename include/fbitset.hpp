@@ -464,6 +464,19 @@ public:
         });
     }
 
+    //
+    // Bits as container.
+    //
+
+    /** Gets the iterator for the indices of the set bits.
+     *
+     * The resulted iterator is of type `Fbitset::const_iterator` class.  This
+     * makes the bit set similar to an iterable container for the indices of
+     * the set bits.
+     */
+
+    const_iterator begin() const { return const_iterator(*this); }
+
 private:
     //
     // Internal core functions.
