@@ -86,6 +86,15 @@ namespace internal {
     inline Size clz(unsigned long x) { return __builtin_clzl(x); }
     inline Size clz(unsigned long long x) { return __builtin_clzll(x); }
 
+    /** Counts the number of trailing zeros.
+     *
+     * The input cannot be zero.
+     */
+
+    inline Size ctz(unsigned int x) { return __builtin_ctz(x); }
+    inline Size ctz(unsigned long x) { return __builtin_ctzl(x); }
+    inline Size ctz(unsigned long long x) { return __builtin_ctzll(x); }
+
     /** Finds the index of the first set bit.
      *
      * The input cannot be zero.
