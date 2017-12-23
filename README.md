@@ -1,4 +1,4 @@
-https://circleci.com/gh/tschijnmo/fbitset.svg?style=shield
+[![Build Status](https://circleci.com/gh/tschijnmo/fbitset.svg?style=shield)](https://circleci.com/gh/tschijnmo/fbitset)
 
 # fbitset
 A header-only C++ bitset library focusing on performance and simplicity
