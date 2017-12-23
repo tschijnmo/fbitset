@@ -6,11 +6,11 @@ jobs:
     steps:
       - checkout
       - run: |
-        mkdir cmake-test-debug
-        cd cmake-test-debug
-        cmake -DCMAKE_BUILD_TYPE=debug ..
-        make
-        ./test/testmain
+          mkdir cmake-test-debug
+          cd cmake-test-debug
+          cmake -DCMAKE_BUILD_TYPE=debug ..
+          make
+          ./test/testmain
 
   test_release:
     docker:
@@ -18,11 +18,11 @@ jobs:
     steps:
       - checkout
       - run: |
-        mkdir cmake-test-release
-        cd cmake-test-release
-        cmake -DCMAKE_BUILD_TYPE=release ..
-        make
-        ./test/testmain
+          mkdir cmake-test-release
+          cd cmake-test-release
+          cmake -DCMAKE_BUILD_TYPE=release ..
+          make
+          ./test/testmain
 
 workflows:
   version: 2
