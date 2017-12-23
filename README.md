@@ -1,3 +1,5 @@
+https://circleci.com/gh/tschijnmo/fbitset.svg?style=shield
+
 # fbitset
 A header-only C++ bitset library focusing on performance and simplicity
 
