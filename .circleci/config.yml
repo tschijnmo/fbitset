@@ -2,25 +2,25 @@ version: 2
 jobs:
   test_debug:
     docker:
-      - image: tschijnmo/gccpython:latest
+      - image: tschijnmo/drudge:corebase
     steps:
-      - checkout
       - run: |
+          git clone --recurse-submodules https://github.com/tschijnmo/fbitset.git
           mkdir cmake-test-debug
           cd cmake-test-debug
-          cmake -DCMAKE_BUILD_TYPE=debug ..
+          cmake -DCMAKE_BUILD_TYPE=debug ../fbitset
           make
           ./test/testmain
 
   test_release:
     docker:
-      - image: tschijnmo/gccpython:latest
+      - image: tschijnmo/drudge:corebase
     steps:
-      - checkout
       - run: |
+          git clone --recurse-submodules https://github.com/tschijnmo/fbitset.git
           mkdir cmake-test-release
           cd cmake-test-release
-          cmake -DCMAKE_BUILD_TYPE=release ..
+          cmake -DCMAKE_BUILD_TYPE=release ../fbitset
           make
           ./test/testmain
 
