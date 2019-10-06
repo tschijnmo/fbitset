@@ -227,13 +227,33 @@ protected:
     //
     // Core visiting functions.
     //
-    // These functions aims to abstract away from the actual data layout of the
-    // bit sets.  Usually a generic callable needs to be given, which can treat
-    // both `Int_limbs` arguments or `Ext_limbs` arguments.  For looping over
-    // limbs, normally we loop an index from zero up to `n_limbs()`.  It
-    // has been shown that both g++ and clang++ optimize this loop better than
-    // the begin/end iterator pair paradigm.
+    // These functions aims to abstract away the actual data layout of the bit
+    // sets, so that subclass can access them transparently.  Note that they
+    // are generally written as template functions to work automatically with
+    // both const and non-const this, while preserving the const-correctness.
+    // Generally pointers are used, instead of references, since the argument
+    // is most likely `this`.
     //
+
+    /** Gets a pointer to the limbs.
+     *
+     * This might be the most intuitive way to access the limbs, but note that
+     * it is almost surely not the most efficient way to loop limbs over,
+     * specially when the limbs are stored in-place.  See functions like
+     * `exec_limbs`, which can make it much easier for the compilers to unroll
+     * the loop for in-place storage.  This function is more for random access
+     * patterns.
+     */
+    template <typename B> static auto limbs(B* o)
+    {
+        static_assert(std::is_base_of_v<Fbitset_base, std::decay_t<B>>);
+        auto& first_int = o->limbs_.int_[0];
+        if constexpr (NO_EXT) {
+            return &first_int;
+        } else {
+            return &(o->is_inplace() ? first_int : o->limbs_.ext_[0]);
+        }
+    }
 
     /** Takes an unary action on the limbs.
      */
@@ -731,15 +751,13 @@ private:
     const Limb& get_limb_lidx(Size lidx) const noexcept
     {
         assert(lidx < this->n_limbs());
-
-        return Base::exec_limbs(this,
-            [lidx](auto& limbs) -> decltype(auto) { return limbs[lidx]; });
+        return Base::limbs(this)[lidx];
     }
 
     Limb& get_limb_lidx(Size lidx) noexcept
     {
-        return const_cast<Limb&>(
-            static_cast<const Fbitset*>(this)->get_limb_lidx(lidx));
+        assert(lidx < this->n_limbs());
+        return Base::limbs(this)[lidx];
     }
 
     //
