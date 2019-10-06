@@ -342,7 +342,7 @@ public:
 
         explicit operator bool() const noexcept
         {
-            return curr_limb_ < fbitset_.get_n_limbs();
+            return curr_limb_ < fbitset_.n_limbs();
         }
 
         Size operator*() const noexcept { return curr_; }
@@ -459,7 +459,7 @@ public:
     size_t hash() const noexcept
     {
         return exec_limbs(this, [this](const auto& limbs) -> size_t {
-            return hash(limbs.cbegin(), get_n_limbs());
+            return hash(limbs.cbegin(), this->n_limbs());
         });
     }
 
@@ -498,7 +498,7 @@ public:
     void clear() noexcept
     {
         exec_limbs(this, [this](auto& limbs) {
-            for (Size i = 0; i < get_n_limbs(); ++i) {
+            for (Size i = 0; i < this->n_limbs(); ++i) {
                 limbs[i] = 0;
             }
         });
@@ -579,7 +579,7 @@ public:
      */
     Size find_last() const noexcept
     {
-        for (Size i = get_n_limbs(); i != 0; --i) {
+        for (Size i = this->n_limbs(); i != 0; --i) {
             const auto& limb = get_limb_lidx(i - 1);
             if (limb != 0) {
                 Size idx = internal::fls(limb);
@@ -595,7 +595,7 @@ public:
     {
         return exec_limbs(this, [this](const auto& limbs) -> Size {
             Size res = 0;
-            for (Size i = 0; i < get_n_limbs(); ++i) {
+            for (Size i = 0; i < this->n_limbs(); ++i) {
                 res += internal::popcount(limbs[i]);
             }
             return res;
@@ -632,13 +632,6 @@ private:
         }
     }
 
-    /** Gets the number of limbs.
-     */
-    Size get_n_limbs() const noexcept
-    {
-        return (this->size() + LIMB_BITS - 1) / LIMB_BITS;
-    }
-
     /** Gets the limb mask for a given bit index.
      */
     static Limb get_mask(Size idx) noexcept
@@ -669,7 +662,7 @@ private:
      */
     const Limb& get_limb_lidx(Size lidx) const noexcept
     {
-        assert(lidx < get_n_limbs());
+        assert(lidx < this->n_limbs());
 
         return exec_limbs(this,
             [lidx](auto& limbs) -> decltype(auto) { return limbs[lidx]; });
