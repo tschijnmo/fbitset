@@ -256,6 +256,70 @@ protected:
     }
 
     /** Takes an unary action on the limbs.
+     *
+     * @param act a callable which can be called for both `Int_limbs` arguments
+     * or `Ext_limbs` arguments.  For looping over limbs, range-based loop or
+     * using the `size()` of the argument is recommended.  `n_limbs()` may
+     * necessitate additional computing of the number of limbs and branching.
+     * Since generally the in-place limbs can be stored in a single cache line,
+     * when there are trailing zero limbs, the additional processing of the
+     * suffix generally incurs little overhead.  For instance, to compute the
+     * or of two limbs stored in place, with external storage disabled, g++
+     * 9.2.0 gives
+     *
+     * ```asm
+     * 	movl	(%rsi), %ecx
+     * 	movdqu	8(%rsi), %xmm0
+     * 	movq	%rdi, %rax
+     * 	movl	%ecx, (%rdi)
+     * 	movq	8(%rsi), %rdi
+     * 	movups	%xmm0, 8(%rax)
+     * 	orq	8(%rdx), %rdi
+     * 	movq	16(%rsi), %rcx
+     * 	movq	%rdi, 8(%rax)
+     * 	orq	16(%rdx), %rcx
+     * 	movq	%rcx, 16(%rax)
+     * 	ret
+     * ```
+     *
+     * compared with the same operation with `n_limbs()`,
+     *
+     * ```asm
+     * movl	(%rsi), %ecx
+     * movdqu	8(%rsi), %xmm0
+     * movq	%rdi, %rax
+     * movl	%ecx, (%rdi)
+     * movups	%xmm0, 8(%rdi)
+     * testl	%ecx, %ecx
+     * jle	.L18
+     * addl	$63, %ecx
+     * movq	8(%rdx), %rsi
+     * orq	%rsi, 8(%rdi)
+     * sarl	$6, %ecx
+     * cmpl	$1, %ecx
+     * je	.L18
+     * movq	16(%rdx), %rsi
+     * orq	%rsi, 16(%rdi)
+     * cmpl	$2, %ecx
+     * je	.L18
+     * movq	24(%rdx), %rsi
+     * orq	%rsi, 24(%rdi)
+     * cmpl	$3, %ecx
+     * je	.L18
+     * movl	$3, %esi
+     * .L20:
+     * movq	8(%rdx,%rsi,8), %rdi
+     * orq	%rdi, 8(%rax,%rsi,8)
+     * addq	$1, %rsi
+     * cmpl	%esi, %ecx
+     * jg	.L20
+     * .L18:
+     * ret
+     * ```
+     *
+     * Clearly, for example, when the second limb is zero because of a size
+     * less than 65, the additional cost to skip the processing of the second
+     * limb dynamically may not be worthy of the effort.
      */
     template <typename B, typename U>
     static decltype(auto) exec_limbs(B* o, U act)
@@ -303,7 +367,7 @@ protected:
     {
         exec_limbs(
             this, &o, [&act, this](auto& self, const auto& other) -> void {
-                for (Size i = 0; i < n_limbs(); ++i) {
+                for (Size i = 0; i < self.size(); ++i) {
                     act(self[i], other[i]);
                 }
             });
@@ -586,8 +650,8 @@ public:
     void clear() noexcept
     {
         Base::exec_limbs(this, [this](auto& limbs) {
-            for (Size i = 0; i < this->n_limbs(); ++i) {
-                limbs[i] = 0;
+            for (auto& i : limbs) {
+                i = 0;
             }
         });
     }
@@ -667,6 +731,7 @@ public:
      */
     Size find_last() const noexcept
     {
+        // For this, we start with n_limbs to skip some zeroes.
         for (Size i = this->n_limbs(); i != 0; --i) {
             const auto& limb = get_limb_lidx(i - 1);
             if (limb != 0) {
@@ -683,8 +748,8 @@ public:
     {
         return Base::exec_limbs(this, [this](const auto& limbs) -> Size {
             Size res = 0;
-            for (Size i = 0; i < this->n_limbs(); ++i) {
-                res += internal::popcount(limbs[i]);
+            for (auto& i : limbs) {
+                res += internal::popcount(i);
             }
             return res;
         });
