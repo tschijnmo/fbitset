@@ -13,13 +13,13 @@
 #include <initializer_list>
 #include <limits>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 namespace fbitset {
 
 /** The placeholder class to disable the usage of external containers.
  */
-
 struct No_ext {
 };
 
@@ -28,48 +28,13 @@ struct No_ext {
  * Here we use int for performance and compatibility with the `digits` field of
  * numeric_limits.
  */
-
 using Size = int;
 
 namespace internal {
-
-    /** Wrapper over the external container.
-     *
-     * The given type must be a C++ SequenceContainer.
+    /** Utility for checking if the container is `No_ext`.
      */
-
-    template <typename T> struct Ext {
-        /** The container.
-         */
-
-        T limbs;
-
-        static constexpr bool allow_ext = true;
-
-        /** Default constructor.
-         *
-         * This constructs the container by default.
-         */
-
-        Ext()
-            : limbs{}
-        {
-        }
-
-        /** Test if the container is holding any bits.
-         */
-
-        explicit operator bool() const noexcept { return !limbs.empty(); }
-    };
-
-    /** Holder for external container when it is disabled.
-     *
-     * No extra space is taken any more for this case.
-     */
-
-    template <> struct Ext<No_ext> {
-        static constexpr bool allow_ext = false;
-    };
+    template <typename T> constexpr bool is_no_ext = false;
+    template <> constexpr bool is_no_ext<No_ext> = true;
 
     //
     // Misc bit operations
@@ -77,12 +42,14 @@ namespace internal {
     // TODO: Make these operations cross-platform by conditional compilation of
     // intrinsic functions and possibly a fallback mode.
     //
+    // TODO: Investigate a SIMD-based solution to these problems for
+    // SSE/AVX/Neon instructions.
+    //
 
     /** Counts the number of leading zeros.
      *
      * The input cannot be zero.
      */
-
     inline Size clz(unsigned int x) { return __builtin_clz(x); }
     inline Size clz(unsigned long x) { return __builtin_clzl(x); }
     inline Size clz(unsigned long long x) { return __builtin_clzll(x); }
@@ -91,7 +58,6 @@ namespace internal {
      *
      * The input cannot be zero.
      */
-
     inline Size ctz(unsigned int x) { return __builtin_ctz(x); }
     inline Size ctz(unsigned long x) { return __builtin_ctzl(x); }
     inline Size ctz(unsigned long long x) { return __builtin_ctzll(x); }
@@ -100,7 +66,6 @@ namespace internal {
      *
      * The input cannot be zero.
      */
-
     template <typename T> Size fls(T x)
     {
         assert(x != 0);
@@ -109,7 +74,6 @@ namespace internal {
 
     /** Counts the number of set bits.
      */
-
     inline Size popcount(unsigned int x) { return __builtin_popcount(x); }
     inline Size popcount(unsigned long x) { return __builtin_popcountl(x); }
     inline Size popcount(unsigned long long x)
@@ -118,70 +82,240 @@ namespace internal {
     }
 }
 
-/** A set of bits.
+/** The core base class.
  *
- * The data type aims at a compromise between efficiency and generality towards
- * different problems.  It is basically a mixture of the bitset container in
- * STL and the dynamic_bitset in boost.  A number of limbs can be given at the
- * compile-time.  When the number of bits needed is not greater than what can
- * be hold be the limbs, it will be stored right into the limbs.  Otherwise,
- * memory is going to be allocated on the heap.
- *
- * This class is mostly for the convenience of solving combinatorial problems.
- * So the interface might not be fully compatible with standard bitset or boost
- * dynamic_bitset.  For similar reasons, all binary operations, including
- * equality comparison, can only be performed on bit sets of the same type
- * (compile-time check) and the same size (run-time check).
- *
- * This class also aims to be highly configurable.  Internally, the limbs are
- * stored in little-endian format either inside the object or in external
- * containers.
- *
- * @tparam N The number of limbs allowed inside the object directly (not the
- * number of bits).
- *
- * @tparam L The actual integral type to be used for the limbs.
- *
- * @tparam C The sequence container to be used for the limbs when the limbs
- * inside the object cannot take all the bits.  Or `No_ext` can also be given
- * to completely disable the usage of external container, where any attempt to
- * create bit sets that does not fit will cause assertion error.
- *
+ * This base class handles the basic data storage and resource management.
+ * Derived class can transparently access the limbs via the access methods.
  */
-
-template <Size N, typename L = unsigned long long, typename E = std::vector<L>>
-class Fbitset {
+template <Size N, typename L, typename E> class Fbitset_base {
 public:
-    // Check the sensibility of the given types.
-
-    static_assert(std::numeric_limits<L>::is_integer
-            && !std::numeric_limits<L>::is_signed,
-        "Limb needs to be unsigned integral type");
-
     /** The number of limbs allowed inside.
      */
-
     static constexpr Size N_LIMBS = N;
 
     /** The type used for the limbs.
      */
-
     using Limb = L;
 
     /** The number of bits hold by a single limb.
      */
-
     static constexpr Size LIMB_BITS = std::numeric_limits<L>::digits;
 
     /** The maximum number of bits able to be held in-place.
      */
-
     static constexpr Size MAX_BITS = N * LIMB_BITS;
+
+    /** The internal container type.
+     */
+    using Int_limbs = std::array<Limb, N>;
 
     /** The external container type.
      */
-
     using Ext_limbs = E;
+
+    // Check the sensibility of the given types.
+    static_assert(std::numeric_limits<L>::is_integer
+            && !std::numeric_limits<L>::is_signed,
+        "Limb needs to be unsigned integral type");
+
+    // static_assert(sizeof(Int_limbs) >= sizeof(Ext_limbs),
+    //     "Too small number of limbs allowed inside, wasting space");
+
+    /** If external storage is not allowed at all.
+     *
+     * This value will be used with `if constexpr` liberally for performance
+     * boosting when we are sure that the data are inside.  Then all branching
+     * about the decision if the bits is inside/outside can be skipped.
+     */
+    static constexpr bool NO_EXT = internal::is_no_ext<Ext_limbs>;
+
+    /** The basic constructor.
+     */
+    Fbitset_base(Size size)
+        : size_(size)
+    {
+        if constexpr (NO_EXT) {
+            assert(size <= MAX_BITS);
+            limbs_.int_.fill(0);
+        } else {
+            if (is_inplace()) {
+                limbs_.int_.fill(0);
+            } else {
+                new (&limbs_.ext_) Ext_limbs(n_limbs(), 0);
+            }
+        }
+    }
+
+    /** The number of stored bits.
+     */
+    inline Size size() const { return size_; }
+
+    /** Are the bits stored inplace in the object?
+     */
+    inline bool is_inplace() const
+    {
+        if constexpr (NO_EXT) {
+            return true;
+        } else {
+            return size_ <= MAX_BITS;
+        }
+    }
+
+    /** The number of limbs needed to store the bits.
+     */
+    inline Size n_limbs() const { return (size() + LIMB_BITS - 1) / LIMB_BITS; }
+
+    /** Default constructor.
+     */
+    Fbitset_base()
+        : Fbitset_base(0)
+    {
+    }
+
+    /** Copy constructor.
+     */
+    Fbitset_base(const Fbitset_base& o)
+        : size_(o.size())
+    {
+        init(o);
+    }
+
+    /** Move constructor.
+     */
+    Fbitset_base(Fbitset_base&& o)
+        : size_(o.size())
+    {
+        init(std::move(o));
+    }
+
+    /** Destructor.
+     */
+    ~Fbitset_base()
+    {
+        if constexpr (NO_EXT)
+            return;
+        if (!is_inplace()) {
+            limbs_.ext_.~E();
+        }
+    }
+
+    /** Copy assignment.
+     */
+    Fbitset_base& operator=(const Fbitset_base& o)
+    {
+        if (this == &o)
+            return *this;
+
+        this->~Fbitset_base();
+        init(o);
+        return *this;
+    }
+
+    /** Move assignment.
+     */
+    Fbitset_base& operator=(Fbitset_base&& o)
+    {
+        if (this == &o)
+            return *this;
+
+        this->~Fbitset_base();
+        init(std::move(o));
+        return *this;
+    }
+
+protected:
+    /** The number of bits inside.
+     */
+    Size size_;
+
+    /** The core container.
+     *
+     * The constructor and destructor does nothing, the resource management is
+     * handled at Fbitset_base.
+     */
+    union Limbs_ {
+        Int_limbs int_;
+        Ext_limbs ext_;
+
+        Limbs_() {}
+
+        ~Limbs_() {}
+    } limbs_;
+
+    /** Initialize the current bit set from another.
+     *
+     * The T type must be the same Fbitset_base type.  Copy will be performed
+     * for in-place storage.  For external storage, the content will be copied
+     * or moved according to the value category of `o`.
+     */
+    template <typename T> void init(T&& o)
+    {
+        static_assert(std::is_same_v<Fbitset_base, std::decay_t<T>>,
+            "The same Fbitset type is expected");
+
+        if (o.is_inplace()) {
+            limbs_.int_ = o.limbs_.int_;
+        } else {
+            if constexpr (std::is_lvalue_reference_v<T>) {
+                // o is an L-value.
+                new (&limbs_.ext_) E(o.limbs_.ext_);
+            } else {
+                new (&limbs_.ext_) E(std::move(o.limbs_.ext_));
+            }
+        }
+    }
+};
+
+/** A highly optimized bit set.
+ *
+ * This data type aims at a compromise between efficiency and generality
+ * towards different problems.  It is basically a mixture of the bitset
+ * container in STL and the dynamic_bitset in boost.  A size can be given at
+ * the compile-time.  When the number of bits needed is no greater than it,
+ * it will be stored right into the container without external memory
+ * allocation. Otherwise, bits will be stored in a given container type,
+ * which allocates external memory.  This is essentially short-string
+ * optimization applied to bit sets.
+ *
+ * In addition to the short-string optimization, native machine instructions
+ * for some bit operations, like the x86-64 `lzcnt`, will be utilized for deep
+ * optimization.
+ *
+ * This class is mostly for the convenience of solving combinatorial
+ * problems. So the interface is not fully compatible with standard bitset
+ * or boost dynamic_bitset.  For similar reasons, all binary operations,
+ * including equality comparison, can only be performed on bit sets of the
+ * same type (compile-time check) and the same size (run-time check).
+ *
+ * This class also aims to be highly configurable.  Internally, the bits are
+ * organized into limbs, which are stored in a little-endian format either
+ * inside the object or in external containers.  The details of data storage
+ * and resource management are all defined in the class `Fbitset_base`.
+ *
+ * @tparam N The number of limbs allowed inside the object directly (not the
+ * number of bits).  The total size of the limbs should not be less than the
+ * total size of the external container for maximum space efficiency.
+ *
+ * @tparam L The actual integral type to be used for the limbs.
+ *
+ * @tparam C The sequence container to be used for the limbs when the limbs
+ * inside the object cannot take all the bits.  Or `No_ext` can also be
+ * given to completely disable the usage of external container, where any
+ * attempt to create bit sets that does not fit will cause assertion error.
+ *
+ */
+template <Size N, typename L = unsigned long long, typename E = std::vector<L>>
+class Fbitset : public Fbitset_base<N, L, E> {
+public:
+    /** Convenient name for the base.
+     */
+    using Base = Fbitset_base<N, L, E>;
+
+    // Forward some static things from the base class.
+    using Limb = typename Base::Limb;
+    static constexpr auto LIMB_BITS = Base::LIMB_BITS;
+    static constexpr auto MAX_BITS = Base::MAX_BITS;
+    static constexpr auto NO_EXT = Base::NO_EXT;
 
     /** Iterators for iterator over the indices of the set bits.
      *
@@ -190,7 +324,6 @@ public:
      * we can explicitly evaluate the truth value of the iterator to see if it
      * still has a values.
      */
-
     class const_iterator {
     public:
         /** Constructs the iterator for a bit set.
@@ -248,17 +381,14 @@ public:
          *
          * The set bits in this copy are going to be gradually toppled.
          */
-
         Fbitset fbitset_;
 
         /** The current bit index.
          */
-
         Size curr_;
 
         /** The current limb index.
          */
-
         Size curr_limb_;
     };
 
@@ -266,22 +396,9 @@ public:
      *
      * @param size The number of bits that need to be held.
      */
-
     Fbitset(Size size, bool set_true = false)
+        : Base(size)
     {
-        if (size <= MAX_BITS) {
-            for (Size i = 0; i < N; ++i) {
-                limbs_[i] = 0;
-            }
-        } else {
-            if constexpr (allow_ext) {
-                Size n_limbs = (size + LIMB_BITS - 1) / LIMB_BITS;
-                ext_.limbs.assign(n_limbs, 0);
-            } else {
-                assert(0);
-            }
-        }
-
         if (set_true) {
             set_all(size);
         }
@@ -291,10 +408,9 @@ public:
      *
      * The indices should be given as a pair of iterators giving the indices.
      */
-
     template <typename It>
     Fbitset(Size size, It first_idx, It last_idx)
-        : Fbitset(size, false)
+        : Fbitset(size)
     {
         for (; first_idx != last_idx; ++first_idx) {
             set(*first_idx);
@@ -306,36 +422,27 @@ public:
      * This constructor can be useful for creating bit sets as a simple
      * literal.
      */
-
     Fbitset(Size size, std::initializer_list<Size> idxes)
         : Fbitset(size, idxes.begin(), idxes.end())
     {
     }
 
-    // All Special functions are from the default implementation.
-    //
-    // The default gang-of-five should work just fine.
+    // All Special functions are from the base class.  The default gang-of-zero
+    // should work just fine.
 
     //
     // General operations.
     //
 
-    /** Gets the maximum number of bits that can be hold.
-     *
-     * Note that this size is not necessarily the size of bits given to the
-     * constructor, but rather the number of bits that *can be* hold by the bit
-     * set.
-     */
-
-    Size size() const noexcept { return get_n_limbs() * LIMB_BITS; }
-
     /** Makes equality comparison.
+     *
+     * Only available for bit sets of the *same* type.
      */
-
     friend bool operator==(const Fbitset& o1, const Fbitset& o2) noexcept
     {
-        return exec_limbs(&o1, &o2,
-            [](const auto& i, const auto& j) -> bool { return i == j; });
+        return o1.size() == o2.size()
+            && exec_limbs(&o1, &o2,
+                [](const auto& i, const auto& j) -> bool { return i == j; });
     }
 
     friend bool operator!=(const Fbitset& o1, const Fbitset& o2) noexcept
@@ -349,7 +456,6 @@ public:
      * compared.  As a result, the size is *not* put into consideration for
      * this hash function.
      */
-
     size_t hash() const noexcept
     {
         return exec_limbs(this, [this](const auto& limbs) -> size_t {
@@ -359,7 +465,6 @@ public:
 
     /** Sets a given bit.
      */
-
     void set(Size idx) noexcept
     {
         get_limb(idx) |= get_mask(idx);
@@ -370,10 +475,9 @@ public:
      *
      * The lower `num` bits will be all toppled to true.
      */
-
     void set_all(Size num) noexcept
     {
-        assert(num <= size());
+        assert(num <= this->size());
 
         exec_limbs(this, [num](auto& limbs) {
             Size idx = 0;
@@ -391,7 +495,6 @@ public:
 
     /** Clears all bits inside.
      */
-
     void clear() noexcept
     {
         exec_limbs(this, [this](auto& limbs) {
@@ -406,7 +509,6 @@ public:
      * Note that different from STL bitset, here the result is a pr-value of
      * boolean type, rather than a proxy for the actual bit.
      */
-
     bool operator[](Size idx) const noexcept
     {
         return (get_limb(idx) & get_mask(idx)) != 0;
@@ -414,7 +516,6 @@ public:
 
     /** Flips a given bit.
      */
-
     void flip(Size idx) noexcept
     {
         get_limb(idx) ^= get_mask(idx);
@@ -427,7 +528,6 @@ public:
 
     /** Computes the bitwise or (union).
      */
-
     Fbitset& operator|=(const Fbitset& other) noexcept
     {
         zip_limbs(other, [](Limb& i, Limb j) { i |= j; });
@@ -443,7 +543,6 @@ public:
 
     /** Computes the bitwise and (intersection).
      */
-
     Fbitset& operator&=(const Fbitset& other) noexcept
     {
         zip_limbs(other, [](Limb& i, Limb j) { i &= j; });
@@ -459,7 +558,6 @@ public:
 
     /** Computes the bitwise xor (disjunctive union).
      */
-
     Fbitset& operator^=(const Fbitset& other) noexcept
     {
         zip_limbs(other, [](Limb& i, Limb j) { i ^= j; });
@@ -479,7 +577,6 @@ public:
 
     /** Finds the index of the last (highest) set bit.
      */
-
     Size find_last() const noexcept
     {
         for (Size i = get_n_limbs(); i != 0; --i) {
@@ -494,7 +591,6 @@ public:
 
     /** Counts the number of all set bits inside the set.
      */
-
     Size count() const noexcept
     {
         return exec_limbs(this, [this](const auto& limbs) -> Size {
@@ -512,11 +608,10 @@ public:
 
     /** Gets the iterator for the indices of the set bits.
      *
-     * The resulted iterator is of type `Fbitset::const_iterator` class.  This
+     * The resulted iterator is of type `Fbitset::const_iterator` class. This
      * makes the bit set similar to an iterable container for the indices of
      * the set bits.
      */
-
     const_iterator begin() const { return const_iterator(*this); }
 
 private:
@@ -528,39 +623,24 @@ private:
 
     /** Gets the limb index for a given bit index.
      */
-
     static Size get_lidx(Size idx) noexcept
     {
-        if constexpr (!allow_ext && N_LIMBS == 1) {
-            assert(idx < LIMB_BITS);
+        if constexpr (NO_EXT && N == 1) {
             return 0;
         } else {
             return idx / LIMB_BITS;
         }
     }
 
-    /** Get the number of limbs.
-     *
-     * Note that for bits fit inside the object, the result will always be all
-     * the limbs hold by the object.
+    /** Gets the number of limbs.
      */
-
     Size get_n_limbs() const noexcept
     {
-        if constexpr (!allow_ext) {
-            return N_LIMBS;
-        } else {
-            if (ext_) {
-                return ext_.limbs.size();
-            } else {
-                return N_LIMBS;
-            }
-        }
+        return (this->size() + LIMB_BITS - 1) / LIMB_BITS;
     }
 
     /** Gets the limb mask for a given bit index.
      */
-
     static Limb get_mask(Size idx) noexcept
     {
         Limb res = 1;
@@ -573,22 +653,20 @@ private:
      * This method aims at as little overhead over the raw use of the
      * underlying integral type as possible.
      */
-
     const Limb& get_limb(Size idx) const noexcept
     {
-        assert(idx < size());
+        assert(idx < this->size());
         return get_limb_lidx(get_lidx(idx));
     }
 
     Limb& get_limb(Size idx) noexcept
     {
-        assert(idx < size());
+        assert(idx < this->size());
         return get_limb_lidx(get_lidx(idx));
     }
 
     /** Gets the limb at a particular limb index.
      */
-
     const Limb& get_limb_lidx(Size lidx) const noexcept
     {
         assert(lidx < get_n_limbs());
@@ -608,7 +686,7 @@ private:
     //
     // These functions aims to abstract away from the actual data layout of the
     // bit sets.  Usually a generic callable needs to be given, which can treat
-    // both `Limbs` arguments or `Ext_limbs` arguments.  For looping over
+    // both `Int_limbs` arguments or `Ext_limbs` arguments.  For looping over
     // limbs, normally we loop an index from zero up to `get_n_limbs()`.  It
     // has been shown that both g++ and clang++ optimize this loop better than
     // the begin/end iterator pair paradigm.
@@ -616,19 +694,18 @@ private:
 
     /** Takes an unary action on the limbs.
      */
-
     template <typename B, typename U>
     static decltype(auto) exec_limbs(B* o, U act)
     {
         static_assert(std::is_same_v<std::decay_t<B>, Fbitset>);
 
-        if constexpr (!allow_ext) {
-            return act(o->limbs_);
+        if constexpr (NO_EXT) {
+            return act(o->limbs_.int_);
         } else {
-            if (o->ext_) {
-                return act(o->ext_.limbs);
+            if (o->is_inplace()) {
+                return act(o->limbs_.int_);
             } else {
-                return act(o->limbs_);
+                return act(o->limbs_.ext_);
             }
         }
     }
@@ -637,7 +714,6 @@ private:
      *
      * The two bit sets need to be of the same type and have the same size.
      */
-
     template <typename B, typename C, typename U>
     static decltype(auto) exec_limbs(B* o1, C* o2, U act)
     {
@@ -645,22 +721,21 @@ private:
         static_assert(std::is_same_v<std::decay_t<C>, Fbitset>);
         assert(o1->size() == o2->size());
 
-        if constexpr (!allow_ext) {
-            return act(o1->limbs_, o2->limbs_);
+        if constexpr (NO_EXT) {
+            return act(o1->limbs_.int_, o2->limbs_.int_);
         } else {
-            if (o1->ext_) {
-                assert(o2->ext_);
-                return act(o1->ext_.limbs, o2->ext_.limbs);
+            if (o1->is_inplace()) {
+                assert(o2->is_inplace());
+                return act(o1->limbs_.int_, o2->limbs_.int_);
             } else {
-                assert(!o2->ext_);
-                return act(o1->limbs_, o2->limbs_);
+                assert(!o2->is_inplace());
+                return act(o1->limbs_.ext_, o2->limbs_.ext_);
             }
         }
     }
 
     /** Apply the given callable to matching pairs of limbs.
      */
-
     template <typename T> void zip_limbs(const Fbitset& o, T act)
     {
         exec_limbs(
@@ -681,7 +756,6 @@ private:
      *
      * The algorithm is adapted from the boost hash library.
      */
-
     static inline void combine_hash(size_t& seed, size_t value)
     {
         seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
@@ -697,38 +771,14 @@ private:
         }
         return curr;
     }
-
-    //
-    // Internal data fields.
-    //
-
-    /** The container for in-place limbs.
-     */
-
-    using Limbs = std::array<Limb, N>;
-
-    /** The actual limbs stored in-place.
-     */
-
-    Limbs limbs_;
-
-    // The fall-back external container.
-
-    using Ext = internal::Ext<E>;
-
-    static constexpr bool allow_ext = Ext::allow_ext;
-
-    Ext ext_{};
 };
 }
 
 // Inject the hash function into the std namespace.
-
 namespace std {
 
 /** Computes the hash of a subset.
  */
-
 template <fbitset::Size N, typename L, typename E>
 struct hash<fbitset::Fbitset<N, L, E>> {
     size_t operator()(const fbitset::Fbitset<N, L, E>& o) const
