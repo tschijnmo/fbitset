@@ -224,6 +224,74 @@ public:
     }
 
 protected:
+    //
+    // Core visiting functions.
+    //
+    // These functions aims to abstract away from the actual data layout of the
+    // bit sets.  Usually a generic callable needs to be given, which can treat
+    // both `Int_limbs` arguments or `Ext_limbs` arguments.  For looping over
+    // limbs, normally we loop an index from zero up to `n_limbs()`.  It
+    // has been shown that both g++ and clang++ optimize this loop better than
+    // the begin/end iterator pair paradigm.
+    //
+
+    /** Takes an unary action on the limbs.
+     */
+    template <typename B, typename U>
+    static decltype(auto) exec_limbs(B* o, U act)
+    {
+        static_assert(std::is_base_of_v<Fbitset_base, std::decay_t<B>>);
+
+        if constexpr (NO_EXT) {
+            return act(o->limbs_.int_);
+        } else {
+            if (o->is_inplace()) {
+                return act(o->limbs_.int_);
+            } else {
+                return act(o->limbs_.ext_);
+            }
+        }
+    }
+
+    /** Takes a binary operation on the limbs.
+     *
+     * The two bit sets need to be of the same type and have the same size.
+     */
+    template <typename B, typename C, typename U>
+    static decltype(auto) exec_limbs(B* o1, C* o2, U act)
+    {
+        static_assert(std::is_base_of_v<Fbitset_base, std::decay_t<B>>);
+        static_assert(std::is_base_of_v<Fbitset_base, std::decay_t<C>>);
+        assert(o1->size() == o2->size());
+
+        if constexpr (NO_EXT) {
+            return act(o1->limbs_.int_, o2->limbs_.int_);
+        } else {
+            if (o1->is_inplace()) {
+                assert(o2->is_inplace());
+                return act(o1->limbs_.int_, o2->limbs_.int_);
+            } else {
+                assert(!o2->is_inplace());
+                return act(o1->limbs_.ext_, o2->limbs_.ext_);
+            }
+        }
+    }
+
+    /** Apply the given callable to matching pairs of limbs.
+     */
+    template <typename T> void zip_limbs(const Fbitset_base& o, T act)
+    {
+        exec_limbs(
+            this, &o, [&act, this](auto& self, const auto& other) -> void {
+                for (Size i = 0; i < n_limbs(); ++i) {
+                    act(self[i], other[i]);
+                }
+            });
+
+        return;
+    }
+
+private:
     /** The number of bits inside.
      */
     Size size_;
@@ -356,7 +424,7 @@ public:
     private:
         void get_next() noexcept
         {
-            curr_ = exec_limbs(&fbitset_, [this](auto& limbs) -> Size {
+            curr_ = Base::exec_limbs(&fbitset_, [this](auto& limbs) -> Size {
                 while (*this && limbs[curr_limb_] == 0) {
                     ++curr_limb_;
                 }
@@ -441,7 +509,7 @@ public:
     friend bool operator==(const Fbitset& o1, const Fbitset& o2) noexcept
     {
         return o1.size() == o2.size()
-            && exec_limbs(&o1, &o2,
+            && Base::exec_limbs(&o1, &o2,
                 [](const auto& i, const auto& j) -> bool { return i == j; });
     }
 
@@ -458,7 +526,7 @@ public:
      */
     size_t hash() const noexcept
     {
-        return exec_limbs(this, [this](const auto& limbs) -> size_t {
+        return Base::exec_limbs(this, [this](const auto& limbs) -> size_t {
             return hash(limbs.cbegin(), this->n_limbs());
         });
     }
@@ -479,7 +547,7 @@ public:
     {
         assert(num <= this->size());
 
-        exec_limbs(this, [num](auto& limbs) {
+        Base::exec_limbs(this, [num](auto& limbs) {
             Size idx = 0;
             auto remain = num;
             while (remain >= LIMB_BITS) {
@@ -497,7 +565,7 @@ public:
      */
     void clear() noexcept
     {
-        exec_limbs(this, [this](auto& limbs) {
+        Base::exec_limbs(this, [this](auto& limbs) {
             for (Size i = 0; i < this->n_limbs(); ++i) {
                 limbs[i] = 0;
             }
@@ -530,7 +598,7 @@ public:
      */
     Fbitset& operator|=(const Fbitset& other) noexcept
     {
-        zip_limbs(other, [](Limb& i, Limb j) { i |= j; });
+        Base::zip_limbs(other, [](Limb& i, Limb j) { i |= j; });
         return *this;
     }
 
@@ -545,7 +613,7 @@ public:
      */
     Fbitset& operator&=(const Fbitset& other) noexcept
     {
-        zip_limbs(other, [](Limb& i, Limb j) { i &= j; });
+        Base::zip_limbs(other, [](Limb& i, Limb j) { i &= j; });
         return *this;
     }
 
@@ -560,7 +628,7 @@ public:
      */
     Fbitset& operator^=(const Fbitset& other) noexcept
     {
-        zip_limbs(other, [](Limb& i, Limb j) { i ^= j; });
+        Base::zip_limbs(other, [](Limb& i, Limb j) { i ^= j; });
         return *this;
     }
 
@@ -593,7 +661,7 @@ public:
      */
     Size count() const noexcept
     {
-        return exec_limbs(this, [this](const auto& limbs) -> Size {
+        return Base::exec_limbs(this, [this](const auto& limbs) -> Size {
             Size res = 0;
             for (Size i = 0; i < this->n_limbs(); ++i) {
                 res += internal::popcount(limbs[i]);
@@ -664,7 +732,7 @@ private:
     {
         assert(lidx < this->n_limbs());
 
-        return exec_limbs(this,
+        return Base::exec_limbs(this,
             [lidx](auto& limbs) -> decltype(auto) { return limbs[lidx]; });
     }
 
@@ -672,73 +740,6 @@ private:
     {
         return const_cast<Limb&>(
             static_cast<const Fbitset*>(this)->get_limb_lidx(lidx));
-    }
-
-    //
-    // Core visiting functions.
-    //
-    // These functions aims to abstract away from the actual data layout of the
-    // bit sets.  Usually a generic callable needs to be given, which can treat
-    // both `Int_limbs` arguments or `Ext_limbs` arguments.  For looping over
-    // limbs, normally we loop an index from zero up to `get_n_limbs()`.  It
-    // has been shown that both g++ and clang++ optimize this loop better than
-    // the begin/end iterator pair paradigm.
-    //
-
-    /** Takes an unary action on the limbs.
-     */
-    template <typename B, typename U>
-    static decltype(auto) exec_limbs(B* o, U act)
-    {
-        static_assert(std::is_same_v<std::decay_t<B>, Fbitset>);
-
-        if constexpr (NO_EXT) {
-            return act(o->limbs_.int_);
-        } else {
-            if (o->is_inplace()) {
-                return act(o->limbs_.int_);
-            } else {
-                return act(o->limbs_.ext_);
-            }
-        }
-    }
-
-    /** Takes a binary operation on the limbs.
-     *
-     * The two bit sets need to be of the same type and have the same size.
-     */
-    template <typename B, typename C, typename U>
-    static decltype(auto) exec_limbs(B* o1, C* o2, U act)
-    {
-        static_assert(std::is_same_v<std::decay_t<B>, Fbitset>);
-        static_assert(std::is_same_v<std::decay_t<C>, Fbitset>);
-        assert(o1->size() == o2->size());
-
-        if constexpr (NO_EXT) {
-            return act(o1->limbs_.int_, o2->limbs_.int_);
-        } else {
-            if (o1->is_inplace()) {
-                assert(o2->is_inplace());
-                return act(o1->limbs_.int_, o2->limbs_.int_);
-            } else {
-                assert(!o2->is_inplace());
-                return act(o1->limbs_.ext_, o2->limbs_.ext_);
-            }
-        }
-    }
-
-    /** Apply the given callable to matching pairs of limbs.
-     */
-    template <typename T> void zip_limbs(const Fbitset& o, T act)
-    {
-        exec_limbs(
-            this, &o, [&act, this](auto& self, const auto& other) -> void {
-                for (Size i = 0; i < get_n_limbs(); ++i) {
-                    act(self[i], other[i]);
-                }
-            });
-
-        return;
     }
 
     //
