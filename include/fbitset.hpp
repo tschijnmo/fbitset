@@ -474,7 +474,7 @@ public:
      * Note that this iterator class does not satisfy the C++ iterator concept.
      * Rather than having a sentinel value to compare for testing the end, here
      * we can explicitly evaluate the truth value of the iterator to see if it
-     * still has a values.
+     * still has a values, similar to the Java-style `hasNext()`.
      */
     class const_iterator {
     public:
@@ -484,64 +484,80 @@ public:
          * bit in the given bit set.  Normally the `begin` method can be used
          * instead.
          */
-
         const_iterator(const Fbitset& fbitset)
-            : fbitset_{ fbitset }
-            , curr_limb_{ 0 }
+            : curr_{ Base::limbs(&fbitset) }
+            , last_{ curr_ + fbitset.n_limbs() }
         {
+            if (*this) {
+                limb_ = *curr_;
+            }
             get_next();
         }
 
-        explicit operator bool() const noexcept
+        /** Is the iterator still pointing to a valid element.
+         */
+        explicit operator bool() const noexcept { return curr_ < last_; }
+
+        /** Gets the index of the current index of the set bit.
+         *
+         * PR-value of the Size type will be directly returned.
+         */
+        Size operator*() const noexcept
         {
-            return curr_limb_ < fbitset_.n_limbs();
+            assert(*this && limb_ != 0);
+            Size curr_idx = internal::ctz(limb_);
+            return curr_idx + base_;
         }
 
-        Size operator*() const noexcept { return curr_; }
-
+        /** Advances the iterator.
+         */
         const_iterator& operator++() noexcept
         {
+            assert(*this && limb_ != 0);
+            Size curr_idx = internal::ctz(limb_);
+            Limb mask = Limb(1) << curr_idx;
+            assert((limb_ & mask) != 0);
+            limb_ ^= mask;
             get_next();
             return *this;
         }
 
     private:
+        /** Move the current pointer to the next non-zero limb.
+         *
+         * The copy of the current limb and base will also be updated to keep
+         * the invariant.
+         */
         void get_next() noexcept
         {
-            curr_ = Base::exec_limbs(&fbitset_, [this](auto& limbs) -> Size {
-                while (*this && limbs[curr_limb_] == 0) {
-                    ++curr_limb_;
-                }
-
-                if (*this) {
-                    auto& limb = limbs[curr_limb_];
-                    assert(limb != 0);
-                    Size curr_idx = internal::ctz(limb);
-
-                    Limb mask = Limb(1) << curr_idx;
-                    assert((limb & mask) != 0);
-                    limb ^= mask;
-
-                    return curr_idx + curr_limb_ * LIMB_BITS;
-                } else {
-                    return -1;
-                }
-            });
+            while (curr_ < last_ && limb_ == 0) {
+                ++curr_;
+                limb_ = *curr_;
+                base_ += LIMB_BITS;
+            }
         }
 
-        /** A copy of the original bit set.
+        /** A pointer to the current limb to loop over.
+         */
+        const Limb* curr_;
+
+        /** The sentinel for looping the limbs over.
+         */
+        const Limb* last_;
+
+        /** The base to which limb-internal indices will be added to.
          *
-         * The set bits in this copy are going to be gradually toppled.
+         * This will be incremented when we loop over to the next limb.
          */
-        Fbitset fbitset_;
+        Size base_{ 0 };
 
-        /** The current bit index.
+        /** A copy of the current limb.
+         *
+         * It always starts with being a copy of the limb pointed to by
+         * `curr_`.  Bits in this copy will gradually be toppled to zero during
+         * the loop.
          */
-        Size curr_;
-
-        /** The current limb index.
-         */
-        Size curr_limb_;
+        Limb limb_;
     };
 
     /** Initializes to an all-false bit set of a given size.
