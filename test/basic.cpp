@@ -7,7 +7,9 @@
  * - No external, multiple limb,
  * - Allow external, using some limbs,
  * - Allow external, using all limbs,
- * - Allow external, using external.
+ * - Allow external, using external,
+ * - Allow external, default 0, which is normally three limbs inside on x86-64
+ *   LLP platforms.
  *
  */
 
@@ -31,6 +33,7 @@ TEST_CASE("Fbitset has basic behaviour")
     Fbitset<2, uint64_t, std::vector<uint64_t>> ae_sl(N_BITS);
     Fbitset<2, uint32_t, std::vector<uint32_t>> ae_al(N_BITS);
     Fbitset<1, uint32_t, std::vector<uint32_t>> ae_e(N_BITS);
+    Fbitset<> default_conf(N_BITS);
 
     auto run_on_all = [&](auto act) {
         act(ne_1l);
@@ -38,6 +41,7 @@ TEST_CASE("Fbitset has basic behaviour")
         act(ae_sl);
         act(ae_al);
         act(ae_e);
+        act(default_conf);
     };
 
     SECTION("are initialized to all false by default")

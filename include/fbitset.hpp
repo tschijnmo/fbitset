@@ -88,13 +88,17 @@ namespace internal {
  */
 template <Size N, typename L, typename E> class Fbitset_base {
 public:
-    /** The number of limbs allowed inside.
-     */
-    static constexpr Size N_LIMBS = N;
-
     /** The type used for the limbs.
      */
     using Limb = L;
+
+    /** The external container type.
+     */
+    using Ext_limbs = E;
+
+    /** The number of limbs allowed inside.
+     */
+    static constexpr Size N_LIMBS = N ? N : sizeof(Ext_limbs) / sizeof(Limb);
 
     /** The number of bits hold by a single limb.
      */
@@ -102,15 +106,11 @@ public:
 
     /** The maximum number of bits able to be held in-place.
      */
-    static constexpr Size MAX_BITS = N * LIMB_BITS;
+    static constexpr Size MAX_BITS = N_LIMBS * LIMB_BITS;
 
     /** The internal container type.
      */
-    using Int_limbs = std::array<Limb, N>;
-
-    /** The external container type.
-     */
-    using Ext_limbs = E;
+    using Int_limbs = std::array<Limb, N_LIMBS>;
 
     // Check the sensibility of the given types.
     static_assert(std::numeric_limits<L>::is_integer
@@ -445,7 +445,10 @@ private:
  *
  * @tparam N The number of limbs allowed inside the object directly (not the
  * number of bits).  The total size of the limbs should not be less than the
- * total size of the external container for maximum space efficiency.
+ * total size of the external container for maximum space efficiency.  By
+ * the default value of 0, limbs will be stored inside if the place for the
+ * external storage can accommodate them, which is common for short-string
+ * optimization.
  *
  * @tparam L The actual integral type to be used for the limbs.
  *
@@ -455,7 +458,8 @@ private:
  * attempt to create bit sets that does not fit will cause assertion error.
  *
  */
-template <Size N, typename L = unsigned long long, typename E = std::vector<L>>
+template <Size N = 0, typename L = unsigned long long,
+    typename E = std::vector<L>>
 class Fbitset : public Fbitset_base<N, L, E> {
 public:
     /** Convenient name for the base.
@@ -464,6 +468,7 @@ public:
 
     // Forward some static things from the base class.
     using Limb = typename Base::Limb;
+    static constexpr auto N_LIMBS = Base::N_LIMBS;
     static constexpr auto LIMB_BITS = Base::LIMB_BITS;
     static constexpr auto MAX_BITS = Base::MAX_BITS;
     static constexpr auto NO_EXT = Base::NO_EXT;
@@ -800,7 +805,7 @@ private:
      */
     static Size get_lidx(Size idx) noexcept
     {
-        if constexpr (NO_EXT && N == 1) {
+        if constexpr (NO_EXT && N_LIMBS == 1) {
             return 0;
         } else {
             return idx / LIMB_BITS;
