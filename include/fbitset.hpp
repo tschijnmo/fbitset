@@ -25,10 +25,9 @@ struct No_ext {
 
 /** The integral type used for bit/limb indices and sizes.
  *
- * Here we use int for performance and compatibility with the `digits` field of
- * numeric_limits.
+ * Here we just use the native size_t.
  */
-using Size = int;
+using Size = size_t;
 
 namespace internal {
     /** Utility for checking if the container is `No_ext`.
