@@ -588,7 +588,9 @@ public:
 
     /** Makes equality comparison.
      *
-     * Only available for bit sets of the *same* type.
+     * Only available for bit sets of the *same* type.  Note that two bit sets
+     * are equal only if they were constructed to be of the same size, or they
+     * shall be considered unequal even if the same set of bits are set.
      */
     friend bool operator==(const Fbitset& o1, const Fbitset& o2) noexcept
     {
@@ -604,14 +606,19 @@ public:
 
     /** Computes the hash of a subset.
      *
-     * Note that we assume that only bit sets of the same size are going to be
-     * compared.  As a result, the size is *not* put into consideration for
-     * this hash function.
+     * To be consistent with the equality comparison, here, two bit sets will
+     * hash differently if they are constructed to have different sizes.
      */
     size_t hash() const noexcept
     {
         return Base::exec_limbs(this, [this](const auto& limbs) -> size_t {
-            return hash(limbs.cbegin(), this->n_limbs());
+            size_t curr = this->size();
+            std::hash<Limb> hasher{};
+            for (auto i : limbs) {
+                // The algorithm is adapted from the boost hash library.
+                curr ^= hasher(i) + 0x9e3779b9 + (curr << 6) + (curr >> 2);
+            }
+            return curr;
         });
     }
 
@@ -823,30 +830,6 @@ private:
     {
         assert(lidx < this->n_limbs());
         return Base::limbs(this)[lidx];
-    }
-
-    //
-    // Hash related.
-    //
-
-    /** Combines the given hash values.
-     *
-     * The algorithm is adapted from the boost hash library.
-     */
-    static inline void combine_hash(size_t& seed, size_t value)
-    {
-        seed ^= value + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    }
-
-    template <typename It> static size_t hash(It first, Size n)
-    {
-        size_t curr = 0;
-        std::hash<Limb> hasher{};
-        for (Size i = 0; i < n; ++i) {
-            combine_hash(curr, hasher(*first));
-            ++first;
-        }
-        return curr;
     }
 };
 }
